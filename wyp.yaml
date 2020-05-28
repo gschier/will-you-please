@@ -3,7 +3,7 @@ scripts:
     combine: [sleep333, sleep1, sleep22]
   install:
     help: install current project
-    run: go install ./...
+    run: go install
   start:
     help: print "start"
     run: echo "start"
