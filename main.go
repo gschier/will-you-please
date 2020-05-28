@@ -20,7 +20,6 @@ const configFilePath = "./wyp.yaml"
 
 type Script struct {
 	Run     string            `yaml:"run"`
-	Watch   string            `yaml:"watch"`
 	Help    string            `yaml:"help"`
 	Env     map[string]string `yaml:"env"`
 	Combine []string          `yaml:"combine"`
