@@ -1,4 +1,4 @@
-module github.com/gschier/willyouplease
+module github.com/gschier/wyp
 
 go 1.13
 
