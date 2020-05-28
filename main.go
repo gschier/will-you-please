@@ -16,6 +16,8 @@ import (
 	"sync"
 )
 
+const configFilePath = "./wyp.yaml"
+
 type Script struct {
 	Run     string            `yaml:"run"`
 	Watch   string            `yaml:"watch"`
@@ -27,22 +29,6 @@ type Script struct {
 }
 
 func main() {
-	viperConf := viper.New()
-	viperConf.SetConfigName("wyp")
-	viperConf.SetConfigType("yaml")
-	viperConf.AddConfigPath(".")
-
-	err := viperConf.ReadInConfig()
-	if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-		fmt.Println("[wyp] Missing wyp.yaml Config")
-		os.Exit(1)
-	}
-	if err != nil {
-		panic(fmt.Errorf("Fatal error config file: %s \n", err))
-	}
-
-	scripts := getScripts(viperConf)
-
 	cmdPrint := &cobra.Command{
 		Use:     "print [string to print]",
 		Short:   "Print anything to the screen",
@@ -59,15 +45,17 @@ func main() {
 		Short: "shortcut to run the start script",
 		Args:  cobra.MinimumNArgs(0),
 		Run: func(cmd *cobra.Command, args []string) {
-			exitOnOK(true, "No start script defined")
+			getConfig(true)
+			exit(true, "No start script defined")
 		},
 	}
 
 	cmdRun := &cobra.Command{
 		Use:   "run [script]",
-		Short: "execute script from wyp.yaml by name",
+		Short: "execute script by name",
 	}
 
+	scripts := getScripts(getConfig(false))
 	for name := range scripts {
 		cmd := newRunCmd(name, scripts)
 		cmdRun.AddCommand(cmd)
@@ -93,16 +81,13 @@ func main() {
 
 	cmdInit := &cobra.Command{
 		Use:   "init",
-		Short: "create a new wyp.yaml",
+		Short: "create a new config file",
 		Run: func(cmd *cobra.Command, args []string) {
-			_, err := os.Stat("./wyp.yaml")
-			if err == nil {
-				fmt.Println("[wyp] Current directory is already initialized")
-				os.Exit(1)
+			if fileExists(configFilePath) {
+				exit("Directory already configured")
 			}
-			exitOnErr(err, "Failed to write config file to wyp.yaml")
 
-			err = ioutil.WriteFile("./wyp.yaml", []byte(strings.Join([]string{
+			err := ioutil.WriteFile(configFilePath, []byte(strings.Join([]string{
 				"scripts:",
 				"  start:",
 				"    combine: [ greet, sleep ]",
@@ -112,7 +97,7 @@ func main() {
 				"  sleep:",
 				"    help: catch some z's",
 				"    run: while true; do echo \"zzz\"; sleep 1; done",
-			}, "\n")), os.ModeAppend)
+			}, "\n")), 0644)
 			exitOnErr(err, "Failed to write wyp.yaml")
 			fmt.Println("[wyp] Generated scripts file at ./wyp.yaml")
 		},
@@ -253,21 +238,9 @@ func defaultStr(str ...string) string {
 }
 
 func getScripts(v *viper.Viper) map[string]Script {
-	var scripts map[string]Script
-	err := v.UnmarshalKey("scripts", &scripts)
-	if err != nil {
-		fmt.Println("[wyp] Failed to parse config file", err)
-		os.Exit(1)
-	}
-
+	scripts := make(map[string]Script)
+	_ = v.UnmarshalKey("scripts", &scripts)
 	return scripts
-}
-
-func getScript(v *viper.Viper, name string) *Script {
-	scripts := getScripts(v)
-	script, ok := scripts[name]
-	exitOnOK(ok, "script not found for", name)
-	return &script
 }
 
 func exitOnErr(err error, v ...interface{}) {
@@ -275,14 +248,42 @@ func exitOnErr(err error, v ...interface{}) {
 		return
 	}
 
-	exitOnOK(true, append(v, err.Error())...)
+	exit(append(v, ": ", err.Error())...)
 }
 
-func exitOnOK(ok bool, v ...interface{}) {
-	if ok {
-		return
+func exit(v ...interface{}) {
+	exitf("%s", fmt.Sprint(v...))
+}
+
+func exitf(tmp string, v ...interface{}) {
+	fmt.Printf("[wyp] "+tmp, v...)
+	fmt.Print("\n")
+	os.Exit(0)
+}
+
+func getConfig(forceExists bool) *viper.Viper {
+	viperConf := viper.New()
+	viperConf.SetConfigName("wyp")
+	viperConf.SetConfigType("yaml")
+	viperConf.AddConfigPath(".")
+
+	err := viperConf.ReadInConfig()
+	if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+		if forceExists {
+			exitf("Missing config file. Run %s to generate one\n", aurora.Underline("wyp init"))
+		}
+	} else {
+		exitOnErr(err, "Failed to read config file")
 	}
 
-	fmt.Println(append([]interface{}{"[wyp] "}, v...)...)
-	os.Exit(1)
+	return viperConf
+}
+
+func fileExists(filename string) bool {
+	_, err := os.Stat(filename)
+	if os.IsNotExist(err) {
+		return false
+	}
+
+	return true
 }

@@ -1,0 +1,9 @@
+scripts:
+  start:
+    combine: [ greet, sleep ]
+  greet:
+    help: say a greeting
+    run: echo Hello World!
+  sleep:
+    help: catch some z's
+    run: while true; do echo "zzz"; sleep 1; done
