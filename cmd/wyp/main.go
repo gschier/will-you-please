@@ -3,48 +3,44 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/logrusorgru/aurora"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v2"
+	"github.com/spf13/viper"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
 	"sync"
 )
 
-/*
-scripts:
-	start:
-		run:
-*/
-
-type Config struct {
-	Scripts map[string]struct {
-		Run        string            `yaml:"run"`
-		Background bool              `yaml:"background"`
-		Watch      string            `yaml:"watch"`
-		Env        map[string]string `yaml:"env"`
-		Combine    []string          `yaml:"combine"`
-		Dir        string            `yaml:"dir"`
-	} `yaml:"scripts"`
+type Script struct {
+	Run     string            `yaml:"run"`
+	Watch   string            `yaml:"watch"`
+	Help    string            `yaml:"help"`
+	Env     map[string]string `yaml:"env"`
+	Combine []string          `yaml:"combine"`
+	Dir     string            `yaml:"dir"`
+	Hide    bool              `yaml:"hide"`
 }
 
 func main() {
-	f, err := os.Open("wyp.yaml")
-	if err != nil {
-		fmt.Println(ioutil.ReadDir("."))
-		panic(err)
-	}
-	defer f.Close()
+	viperConf := viper.New()
+	viperConf.SetConfigName("wyp")
+	viperConf.SetConfigType("yaml")
+	viperConf.AddConfigPath(".")
 
-	var conf Config
-	err = yaml.NewDecoder(f).Decode(&conf)
-	if err != nil {
-		panic(err)
+	err := viperConf.ReadInConfig()
+	if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+		fmt.Println("[wyp] Missing wyp.yaml Config")
+		os.Exit(1)
 	}
+	if err != nil {
+		panic(fmt.Errorf("Fatal error config file: %s \n", err))
+	}
+
+	scripts := getScripts(viperConf)
 
 	cmdPrint := &cobra.Command{
 		Use:     "print [string to print]",
@@ -56,73 +52,29 @@ func main() {
 		},
 	}
 
-	cmdRun := &cobra.Command{
-		Use:   "run [command]",
-		Short: "run a command by name",
-		Args:  cobra.MinimumNArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
-			entryScriptName := args[0]
-			entryScript, ok := conf.Scripts[entryScriptName]
-			if !ok {
-				fmt.Println("script not found for", args[0])
-				os.Exit(1)
-			}
-
-			// If not combine, add Run script to combine so we only
-			// have to deal with that
-			if entryScript.Combine == nil {
-				entryScript.Combine = []string{entryScriptName}
-			}
-
-			maxNameLength := 0
-			for _, n := range entryScript.Combine {
-				if len(n) > maxNameLength {
-					maxNameLength = len(n)
-				}
-			}
-
-			wg := sync.WaitGroup{}
-			for i := 0; i < len(entryScript.Combine); i++ {
-				wg.Add(1)
-				go func(wg *sync.WaitGroup, name string, index int) {
-					defer wg.Done()
-
-					script, ok := conf.Scripts[name]
-					if !ok {
-						fmt.Println("script not found for", name)
-						os.Exit(1)
-					}
-
-					c := exec.CommandContext(context.Background(), "/bin/bash", "-c", script.Run)
-					c.Dir = script.Dir
-					c.Stdin = os.Stdin
-					color := getColor(index)
-					c.Stdout = newPrefixedWriter(os.Stdout, name, maxNameLength, color)
-					c.Stderr = newPrefixedWriter(os.Stderr, name, maxNameLength, color)
-
-					err := c.Start()
-					if err != nil {
-						fmt.Println("[wyp] Failed to run", err)
-						os.Exit(1)
-					}
-
-					if !entryScript.Background {
-						_ = c.Wait()
-					}
-				}(&wg, entryScript.Combine[i], i)
-			}
-
-			wg.Wait()
-		},
-	}
-
+	// Start command will be overridden when creating run commands
 	cmdStart := &cobra.Command{
 		Use:   "start",
 		Short: "shortcut to run the start script",
 		Args:  cobra.MinimumNArgs(0),
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdRun.Run(cmd, append([]string{"start"}, args...))
+			exitOnOK(true, "No start script defined")
 		},
+	}
+
+	cmdRun := &cobra.Command{
+		Use:   "run [script]",
+		Short: "execute script from wyp.yaml by name",
+	}
+
+	for name := range scripts {
+		cmd := newRunCmd(name, scripts)
+		cmdRun.AddCommand(cmd)
+
+		// Replace start command if we found a start script
+		if name == "start" {
+			cmdStart = cmd
+		}
 	}
 
 	cmdKill := &cobra.Command{
@@ -138,10 +90,91 @@ func main() {
 		},
 	}
 
+	cmdScripts := &cobra.Command{
+		Use:   "scripts",
+		Short: "list runnable scripts",
+		Run: func(cmd *cobra.Command, args []string) {
+			scripts := getScripts(viperConf)
+			for name, _ := range scripts {
+				fmt.Println(name)
+			}
+		},
+	}
+
 	rootCmd := &cobra.Command{Use: "wyp"}
-	rootCmd.AddCommand(cmdPrint, cmdRun, cmdStart, cmdKill)
+	rootCmd.AddCommand(cmdPrint, cmdRun, cmdStart, cmdKill, cmdScripts)
 
 	_ = rootCmd.Execute()
+}
+
+func newRunCmd(entryScriptName string, scripts map[string]Script) *cobra.Command {
+	entryScript := scripts[entryScriptName]
+	overrideDir := ""
+	prefixLogs := true
+
+	// If not combine, add Run script to combine so we only
+	// have to deal with that
+	if entryScript.Combine == nil {
+		entryScript.Combine = []string{entryScriptName}
+		prefixLogs = false
+	}
+
+	maxNameLength := 0
+	for _, n := range entryScript.Combine {
+		if len(n) > maxNameLength {
+			maxNameLength = len(n)
+		}
+	}
+
+	// Fill in help for combine script if not there
+	if entryScript.Combine != nil && entryScript.Help == "" {
+		entryScript.Help = fmt.Sprintf("run in parallel %s", strings.Join(entryScript.Combine, ", "))
+	}
+
+	cmd := &cobra.Command{
+		Use:   entryScriptName,
+		Short: entryScript.Help,
+		Hidden: entryScript.Hide,
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Println("[wyp] Running", entryScriptName)
+
+			wg := sync.WaitGroup{}
+			for i := 0; i < len(entryScript.Combine); i++ {
+				wg.Add(1)
+				go func(wg *sync.WaitGroup, name string, index int) {
+					defer wg.Done()
+
+					script, ok := scripts[name]
+					if !ok {
+						fmt.Println("script not found for", name)
+						os.Exit(1)
+					}
+
+					c := exec.CommandContext(context.Background(), "/bin/bash", "-c", script.Run)
+					c.Dir = defaultStr(overrideDir, script.Dir)
+					c.Stdin = os.Stdin
+					c.Stdout = os.Stdout
+					c.Stderr = os.Stderr
+
+					if prefixLogs {
+						color := getColor(index)
+						c.Stdout = newPrefixedWriter(os.Stdout, name, maxNameLength, color)
+						c.Stderr = newPrefixedWriter(os.Stderr, name, maxNameLength, color)
+					}
+
+					err := c.Run()
+					if err != nil {
+						fmt.Println("[wyp] Failed to run", err)
+						os.Exit(1)
+					}
+				}(&wg, entryScript.Combine[i], i)
+			}
+
+			wg.Wait()
+		},
+	}
+	cmd.Flags().StringVar(&overrideDir, "dir", ".", "directory to run from")
+	return cmd
 }
 
 type prefixedWriter struct {
@@ -185,4 +218,54 @@ func getColor(i int) aurora.Color {
 	}
 
 	return colors[i%len(colors)]
+}
+
+func debug(v interface{}) {
+	b, _ := json.MarshalIndent(&v, "", "  ")
+	fmt.Printf("\n[DEBUG] %s\n\n", b)
+}
+
+func defaultStr(str ...string) string {
+	for _, s := range str {
+		if s != "" {
+			return s
+		}
+	}
+
+	return ""
+}
+
+func getScripts(v *viper.Viper) map[string]Script {
+	var scripts map[string]Script
+	err := v.UnmarshalKey("scripts", &scripts)
+	if err != nil {
+		fmt.Println("[wyp] Failed to parse config file", err)
+		os.Exit(1)
+	}
+
+	return scripts
+}
+
+func getScript(v *viper.Viper, name string) *Script {
+	scripts := getScripts(v)
+	script, ok := scripts[name]
+	exitOnOK(ok, "script not found for", name)
+	return &script
+}
+
+func exitOnErr(err error, v ...interface{}) {
+	if err == nil {
+		return
+	}
+
+	exitOnOK(true, append(v, err.Error())...)
+}
+
+func exitOnOK(ok bool, v ...interface{}) {
+	if ok {
+		return
+	}
+
+	fmt.Println(append([]interface{}{"[wyp] "}, v...)...)
+	os.Exit(1)
 }
