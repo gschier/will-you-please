@@ -17,9 +17,8 @@ wyp init
 # List runnable scripts
 wyp run
 
-# Run scripts
-wyp run start
-wyp run greet
+# Run script by name
+wyp run [name]
 
 # Shorthand for running start script
 wyp start
