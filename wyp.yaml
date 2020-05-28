@@ -1,10 +1,7 @@
 scripts:
-  start:
-    combine: [ greet, sleep ]
-  greet:
-    dir: foo
-    help: say a greeting
-    run: echo `pwd` Hello World!
-  sleep:
-    help: catch some z's
-    run: while true; do echo "zzz"; sleep 1; done
+  install:
+    help: run Go install
+    run: go install .
+  test:
+    help: run tests
+    run: go test ./...

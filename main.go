@@ -26,28 +26,33 @@ type Script struct {
 	Combine []string          `yaml:"combine"`
 	Dir     string            `yaml:"dir"`
 	Hide    bool              `yaml:"hide"`
+	Root    bool              `yaml:"root"`
 }
 
 func main() {
-	cmdPrint := &cobra.Command{
-		Use:     "print [string to print]",
-		Short:   "Print anything to the screen",
-		Example: "print Hello World!",
-		Args:    cobra.MinimumNArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println("Print: " + strings.Join(args, " "))
-		},
+	initViper()
+
+	rootCmd := &cobra.Command{
+		Use: "wyp",
 	}
 
 	// Start command will be overridden when creating run commands
-	cmdStart := &cobra.Command{
-		Use:   "start",
-		Short: "shortcut to run the start script",
-		Args:  cobra.MinimumNArgs(0),
-		Run: func(cmd *cobra.Command, args []string) {
-			getConfig(true)
-			exit(true, "No start script defined")
-		},
+	var cmdStart *cobra.Command
+
+	// Detect a start command based on various project formats
+	names, _ := ioutil.ReadDir(".")
+	inspectors := viper.GetStringMap("inspectors")
+	for _, f := range names {
+		if f.IsDir() {
+			continue
+		}
+
+		if (inspectors == nil || inspectors["npm"] != nil) && f.Name() == "package.json" {
+			cmdStart, _ = newRunCmd("start", map[string]Script{"start": {
+				Run:  "npm start",
+				Help: "[npm] start",
+			}})
+		}
 	}
 
 	cmdRun := &cobra.Command{
@@ -55,20 +60,37 @@ func main() {
 		Short: "execute script by name",
 	}
 
-	scripts := getScripts(getConfig(false))
+	scripts := getScripts()
 	for name := range scripts {
-		cmd := newRunCmd(name, scripts)
-		cmdRun.AddCommand(cmd)
+		cmd, script := newRunCmd(name, scripts)
 
-		// Replace start command if we found a start script
+		// Don't add start here. It will be
 		if name == "start" {
 			cmdStart = cmd
+		}
+
+		cmdRun.AddCommand(cmd)
+
+		if script.Root {
+			rootCmd.AddCommand(cmd)
+		}
+	}
+
+	// Add default start command if we didn't find one with that name
+	if cmdStart == nil {
+		cmdStart = &cobra.Command{
+			Use:   "start",
+			Short: "shortcut to run the start script",
+			Args:  cobra.MinimumNArgs(0),
+			Run: func(cmd *cobra.Command, args []string) {
+				exit("No start script defined")
+			},
 		}
 	}
 
 	cmdKill := &cobra.Command{
 		Use:   "kill [pid]",
-		Short: "kill it",
+		Short: "kill a running process",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			c := exec.CommandContext(context.Background(), "kill", args[0])
@@ -103,13 +125,17 @@ func main() {
 		},
 	}
 
-	rootCmd := &cobra.Command{Use: "wyp"}
-	rootCmd.AddCommand(cmdPrint, cmdRun, cmdStart, cmdKill, cmdInit)
+	rootCmd.AddCommand(
+		cmdInit,
+		cmdStart,
+		cmdRun,
+		cmdKill,
+	)
 
 	_ = rootCmd.Execute()
 }
 
-func newRunCmd(entryScriptName string, scripts map[string]Script) *cobra.Command {
+func newRunCmd(entryScriptName string, scripts map[string]Script) (*cobra.Command, *Script) {
 	entryScript := scripts[entryScriptName]
 	overrideDir := ""
 	prefixLogs := true
@@ -138,7 +164,7 @@ func newRunCmd(entryScriptName string, scripts map[string]Script) *cobra.Command
 		Short:  entryScript.Help,
 		Hidden: entryScript.Hide,
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println("[wyp] Running", entryScriptName)
+			fmt.Printf("[wyp] Running scripts.%s\n", entryScriptName)
 
 			wg := sync.WaitGroup{}
 			for i := 0; i < len(entryScript.Combine); i++ {
@@ -176,7 +202,7 @@ func newRunCmd(entryScriptName string, scripts map[string]Script) *cobra.Command
 		},
 	}
 	cmd.Flags().StringVar(&overrideDir, "dir", "", "directory to run from")
-	return cmd
+	return cmd, &entryScript
 }
 
 type prefixedWriter struct {
@@ -222,11 +248,6 @@ func getColor(i int) aurora.Color {
 	return colors[i%len(colors)]
 }
 
-func debug(v interface{}) {
-	b, _ := json.MarshalIndent(&v, "", "  ")
-	fmt.Printf("\n[DEBUG] %s\n\n", b)
-}
-
 func defaultStr(str ...string) string {
 	for _, s := range str {
 		if s != "" {
@@ -237,9 +258,9 @@ func defaultStr(str ...string) string {
 	return ""
 }
 
-func getScripts(v *viper.Viper) map[string]Script {
+func getScripts() map[string]Script {
 	scripts := make(map[string]Script)
-	_ = v.UnmarshalKey("scripts", &scripts)
+	_ = viper.UnmarshalKey("scripts", &scripts)
 	return scripts
 }
 
@@ -261,22 +282,20 @@ func exitf(tmp string, v ...interface{}) {
 	os.Exit(0)
 }
 
-func getConfig(forceExists bool) *viper.Viper {
-	viperConf := viper.New()
-	viperConf.SetConfigName("wyp")
-	viperConf.SetConfigType("yaml")
-	viperConf.AddConfigPath(".")
+func initViper() {
+	viper.SetConfigName("wyp")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath(".")
+	viper.SetDefault("Inspectors", map[string]interface{}{"npm": true})
+	viper.SetDefault("Scripts", []interface{}{})
 
-	err := viperConf.ReadInConfig()
-	if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-		if forceExists {
-			exitf("Missing config file. Run %s to generate one\n", aurora.Underline("wyp init"))
-		}
+	err := viper.ReadInConfig()
+	_, configNotFound := err.(viper.ConfigFileNotFoundError)
+	if err != nil && configNotFound {
+		// That's okay
 	} else {
 		exitOnErr(err, "Failed to read config file")
 	}
-
-	return viperConf
 }
 
 func fileExists(filename string) bool {
@@ -286,4 +305,9 @@ func fileExists(filename string) bool {
 	}
 
 	return true
+}
+
+func debug(v interface{}) {
+	b, _ := json.MarshalIndent(&v, "", "  ")
+	fmt.Printf("\n[DEBUG] %s\n\n", b)
 }
