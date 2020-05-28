@@ -1,5 +1,6 @@
 scripts:
   install:
+    root: true
     help: run Go install
     run: go install .
   test:

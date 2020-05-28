@@ -41,16 +41,17 @@ func main() {
 	// Detect a start command based on various project formats
 	names, _ := ioutil.ReadDir(".")
 	inspectors := viper.GetStringMap("inspectors")
+	scripts := getScripts()
 	for _, f := range names {
 		if f.IsDir() {
 			continue
 		}
 
 		if (inspectors == nil || inspectors["npm"] != nil) && f.Name() == "package.json" {
-			cmdStart, _ = newRunCmd("start", map[string]Script{"start": {
+			scripts["start"] = Script{
 				Run:  "npm start",
-				Help: "[npm] start",
-			}})
+				Help: "start (npm)",
+			}
 		}
 	}
 
@@ -59,7 +60,6 @@ func main() {
 		Short: "execute script by name",
 	}
 
-	scripts := getScripts()
 	for name := range scripts {
 		cmd, script := newRunCmd(name, scripts)
 

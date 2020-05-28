@@ -1,0 +1,19 @@
+{
+  "name": "willyouplease",
+  "version": "1.0.0",
+  "description": "Will you please is a script runner for local development.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gschier/wyp.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/gschier/wyp/issues"
+  },
+  "homepage": "https://github.com/gschier/wyp#readme"
+}
