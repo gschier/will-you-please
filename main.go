@@ -175,7 +175,7 @@ func newRunCmd(entryScriptName string, scripts map[string]Script) *cobra.Command
 			wg.Wait()
 		},
 	}
-	cmd.Flags().StringVar(&overrideDir, "dir", ".", "directory to run from")
+	cmd.Flags().StringVar(&overrideDir, "dir", "", "directory to run from")
 	return cmd
 }
 
