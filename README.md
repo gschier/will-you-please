@@ -8,7 +8,7 @@ Will you please is a script runner for local development.
 go get -u github.com/gschier/wyp
 ```
 
-Or, download and copy the [latest release](/releases/latest) to your PATH.
+Or, download and copy the [latest release](https://github.com/gschier/wyp/releases) to your PATH.
 
 ## Usage
 
