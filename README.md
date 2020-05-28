@@ -57,7 +57,8 @@ scripts:
   
     # Define environment variables for run context
     env:
-      ENV: var
+      - NAME=value
+      - ANOTHER='something that needs quotes'
 
     # Change the directory the command is run in
     dir: './some/other/directory'

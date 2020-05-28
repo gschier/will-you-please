@@ -5,3 +5,7 @@ scripts:
   test:
     help: run tests
     run: go test ./...
+  message:
+    env:
+      - GREETING=World
+    run: echo "Hello $GREETING!"

@@ -19,13 +19,13 @@ import (
 const configFilePath = "./wyp.yaml"
 
 type Script struct {
-	Run     string            `yaml:"run"`
-	Help    string            `yaml:"help"`
-	Env     map[string]string `yaml:"env"`
-	Combine []string          `yaml:"combine"`
-	Dir     string            `yaml:"dir"`
-	Hide    bool              `yaml:"hide"`
-	Root    bool              `yaml:"root"`
+	Run     string   `yaml:"run"`
+	Help    string   `yaml:"help"`
+	Env     []string `yaml:"env"`
+	Combine []string `yaml:"combine"`
+	Dir     string   `yaml:"dir"`
+	Hide    bool     `yaml:"hide"`
+	Root    bool     `yaml:"root"`
 }
 
 func main() {
@@ -182,6 +182,7 @@ func newRunCmd(entryScriptName string, scripts map[string]Script) (*cobra.Comman
 					c.Stdin = os.Stdin
 					c.Stdout = os.Stdout
 					c.Stderr = os.Stderr
+					c.Env = script.Env
 
 					if prefixLogs {
 						color := getColor(index)
