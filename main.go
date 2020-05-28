@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
@@ -90,19 +91,35 @@ func main() {
 		},
 	}
 
-	cmdScripts := &cobra.Command{
-		Use:   "scripts",
-		Short: "list runnable scripts",
+	cmdInit := &cobra.Command{
+		Use:   "init",
+		Short: "create a new wyp.yaml",
 		Run: func(cmd *cobra.Command, args []string) {
-			scripts := getScripts(viperConf)
-			for name, _ := range scripts {
-				fmt.Println(name)
+			_, err := os.Stat("./wyp.yaml")
+			if err == nil {
+				fmt.Println("[wyp] Current directory is already initialized")
+				os.Exit(1)
 			}
+			exitOnErr(err, "Failed to write config file to wyp.yaml")
+
+			err = ioutil.WriteFile("./wyp.yaml", []byte(strings.Join([]string{
+				"scripts:",
+				"  start:",
+				"    combine: [ greet, sleep ]",
+				"  greet:",
+				"    help: say a greeting",
+				"    run: echo Hello World!",
+				"  sleep:",
+				"    help: catch some z's",
+				"    run: while true; do echo \"zzz\"; sleep 1; done",
+			}, "\n")), os.ModeAppend)
+			exitOnErr(err, "Failed to write wyp.yaml")
+			fmt.Println("[wyp] Generated scripts file at ./wyp.yaml")
 		},
 	}
 
 	rootCmd := &cobra.Command{Use: "wyp"}
-	rootCmd.AddCommand(cmdPrint, cmdRun, cmdStart, cmdKill, cmdScripts)
+	rootCmd.AddCommand(cmdPrint, cmdRun, cmdStart, cmdKill, cmdInit)
 
 	_ = rootCmd.Execute()
 }
@@ -132,8 +149,8 @@ func newRunCmd(entryScriptName string, scripts map[string]Script) *cobra.Command
 	}
 
 	cmd := &cobra.Command{
-		Use:   entryScriptName,
-		Short: entryScript.Help,
+		Use:    entryScriptName,
+		Short:  entryScript.Help,
 		Hidden: entryScript.Hide,
 		Run: func(cmd *cobra.Command, args []string) {
 			fmt.Println("[wyp] Running", entryScriptName)
