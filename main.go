@@ -15,6 +15,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 )
 
 const configFilePath = "./wyp.yaml"
@@ -181,7 +182,7 @@ func newRunCmd(ctx context.Context, entryScriptName string, scripts map[string]S
 		Short:  entryScript.Help,
 		Hidden: entryScript.Hide,
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("[wyp] Running script \"%s\"\n\n", entryScriptName)
+			fmt.Printf("[wyp] Running \"%s\" at %s\n", entryScriptName, time.Now().Format(time.Kitchen))
 
 			wg := sync.WaitGroup{}
 			for i := 0; i < len(entryScript.Combine); i++ {
@@ -199,8 +200,11 @@ func newRunCmd(ctx context.Context, entryScriptName string, scripts map[string]S
 						execCmd.Stderr = newPrefixedWriter(os.Stderr, name, maxNameLength, color)
 					}
 
+					startTime := time.Now()
 					err := execCmd.Run()
 					exitOnErr(err, "Failed to run")
+
+					fmt.Printf("[wyp] Completed in %s\n", ago(time.Now().Sub(startTime)))
 				}(&wg, entryScript.Combine[i], i)
 			}
 
@@ -299,9 +303,9 @@ func initViper() {
 	viper.SetConfigName("wyp")
 	viper.AddConfigPath(".")
 	viper.SetDefault("Inspectors", map[string]interface{}{
-		"npm": true,
+		"npm":    true,
 		"docker": true,
-		"make": true,
+		"make":   true,
 	})
 	viper.SetDefault("Scripts", []interface{}{})
 
@@ -341,4 +345,18 @@ func buildExecCmd(ctx context.Context, script *Script) *exec.Cmd {
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	return c
+}
+
+func ago(d time.Duration) string {
+	if d.Hours() > 1 {
+		return fmt.Sprintf("%.1fh", float64(d.Microseconds())/(1000^2/3600))
+	} else if d.Minutes() > 1 {
+		return fmt.Sprintf("%.1fm", float64(d.Microseconds())/(1000^2/60))
+	} else if d.Seconds() > 1 {
+		return fmt.Sprintf("%.1fs", float64(d.Microseconds())/(1000^2))
+	} else if d.Milliseconds() > 1 {
+		return fmt.Sprintf("%.1fms", float64(d.Microseconds())/1000)
+	} else {
+		return fmt.Sprintf("%dμs", d.Microseconds())
+	}
 }
