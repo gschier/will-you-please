@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"github.com/logrusorgru/aurora"
 	"github.com/spf13/cobra"
@@ -29,6 +28,10 @@ type Script struct {
 	Hide    bool     `yaml:"hide"`
 	Root    bool     `yaml:"root"`
 	Shell   string   `yaml:"shell"`
+	Proxy   *struct {
+		Addr string `yaml:"addr"`
+		Port string `yaml:"port"`
+	}
 }
 
 func main() {
@@ -49,6 +52,11 @@ func main() {
 	scripts := getScripts()
 	for _, f := range names {
 		if f.IsDir() {
+			continue
+		}
+
+		// Don't overwrite if there is one already
+		if _, ok := scripts["start"]; ok {
 			continue
 		}
 
@@ -200,11 +208,18 @@ func newRunCmd(ctx context.Context, entryScriptName string, scripts map[string]S
 						execCmd.Stderr = newPrefixedWriter(os.Stderr, name, maxNameLength, color)
 					}
 
+					if script.Proxy != nil {
+						go func() {
+							err := startProxy(script.Proxy.Addr, script.Proxy.Port)
+							exitOnErr(err, "Failed to run proxy")
+						}()
+					}
+
 					startTime := time.Now()
 					err := execCmd.Run()
 					exitOnErr(err, "Failed to run")
 
-					fmt.Printf("[wyp] Completed in %s\n", ago(time.Now().Sub(startTime)))
+					fmt.Printf("\n[wyp] Completed in %s\n", ago(time.Now().Sub(startTime)))
 				}(&wg, entryScript.Combine[i], i)
 			}
 
@@ -242,29 +257,6 @@ func (p2 prefixedWriter) Write(p []byte) (int, error) {
 		_, _ = p2.w.Write(append([]byte(p2.prefix), line...))
 	}
 	return len(p), nil
-}
-
-func getColor(i int) aurora.Color {
-	colors := []aurora.Color{
-		aurora.MagentaFg,
-		aurora.BlueFg,
-		aurora.YellowFg,
-		aurora.CyanFg,
-		aurora.GreenFg,
-		aurora.RedFg,
-	}
-
-	return colors[i%len(colors)]
-}
-
-func defaultStr(str ...string) string {
-	for _, s := range str {
-		if s != "" {
-			return s
-		}
-	}
-
-	return ""
 }
 
 func getScripts() map[string]Script {
@@ -318,20 +310,6 @@ func initViper() {
 	}
 }
 
-func fileExists(filename string) bool {
-	_, err := os.Stat(filename)
-	if os.IsNotExist(err) {
-		return false
-	}
-
-	return true
-}
-
-func debug(v interface{}) {
-	b, _ := json.MarshalIndent(&v, "", "  ")
-	fmt.Printf("\n[DEBUG] %s\n\n", b)
-}
-
 func buildExecCmd(ctx context.Context, script *Script) *exec.Cmd {
 	if runtime.GOOS == "windows" {
 		exit("Windows is not currently supported")
@@ -345,18 +323,4 @@ func buildExecCmd(ctx context.Context, script *Script) *exec.Cmd {
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	return c
-}
-
-func ago(d time.Duration) string {
-	if d.Hours() > 1 {
-		return fmt.Sprintf("%.1fh", float64(d.Microseconds())/(1000^2/3600))
-	} else if d.Minutes() > 1 {
-		return fmt.Sprintf("%.1fm", float64(d.Microseconds())/(1000^2/60))
-	} else if d.Seconds() > 1 {
-		return fmt.Sprintf("%.1fs", float64(d.Microseconds())/(1000^2))
-	} else if d.Milliseconds() > 1 {
-		return fmt.Sprintf("%.1fms", float64(d.Microseconds())/1000)
-	} else {
-		return fmt.Sprintf("%dμs", d.Microseconds())
-	}
 }
