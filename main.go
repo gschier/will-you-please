@@ -75,7 +75,6 @@ func main() {
 		}
 
 		if (inspectors == nil || inspectors["make"] != nil) && f.Name() == "Makefile" {
-			fmt.Println("FOUND")
 			scripts["start"] = Script{
 				Run:  "make",
 				Help: "make (detected)",
