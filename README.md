@@ -65,4 +65,7 @@ scripts:
 
     # Hide command from help output
     hide: true
+
+    # Select between bash/zsh/sh (default: current shell)
+    shell: bash
 ```

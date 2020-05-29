@@ -9,4 +9,11 @@ scripts:
   message:
     env:
       - GREETING=World
-    run: echo "Hello $GREETING!"
+    run: echo Hello $GREETING!
+  env:
+    shell: bash
+    env:
+      - EXTRA=added-in-wyp.yaml
+    run: env
+  shell:
+    run: echo $0

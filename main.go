@@ -12,6 +12,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"sync"
 )
@@ -26,9 +27,12 @@ type Script struct {
 	Dir     string   `yaml:"dir"`
 	Hide    bool     `yaml:"hide"`
 	Root    bool     `yaml:"root"`
+	Shell   string   `yaml:"shell"`
 }
 
 func main() {
+	ctx := context.Background()
+
 	initViper()
 
 	rootCmd := &cobra.Command{
@@ -61,7 +65,7 @@ func main() {
 	}
 
 	for name := range scripts {
-		cmd, script := newRunCmd(name, scripts)
+		cmd, script := newRunCmd(ctx, name, scripts)
 
 		// Don't add start here. It will be
 		if name == "start" {
@@ -134,9 +138,8 @@ func main() {
 	_ = rootCmd.Execute()
 }
 
-func newRunCmd(entryScriptName string, scripts map[string]Script) (*cobra.Command, *Script) {
+func newRunCmd(ctx context.Context, entryScriptName string, scripts map[string]Script) (*cobra.Command, *Script) {
 	entryScript := scripts[entryScriptName]
-	overrideDir := ""
 	prefixLogs := true
 
 	// If not combine, add Run script to combine so we only
@@ -163,7 +166,7 @@ func newRunCmd(entryScriptName string, scripts map[string]Script) (*cobra.Comman
 		Short:  entryScript.Help,
 		Hidden: entryScript.Hide,
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("[wyp] Running scripts.%s\n", entryScriptName)
+			fmt.Printf("[wyp] Running script \"%s\"\n\n", entryScriptName)
 
 			wg := sync.WaitGroup{}
 			for i := 0; i < len(entryScript.Combine); i++ {
@@ -172,36 +175,23 @@ func newRunCmd(entryScriptName string, scripts map[string]Script) (*cobra.Comman
 					defer wg.Done()
 
 					script, ok := scripts[name]
-					if !ok {
-						fmt.Println("script not found for", name)
-						os.Exit(1)
-					}
+					exitOnTrue(ok, "script not found for", name)
 
-					c := exec.CommandContext(context.Background(), "/bin/bash", "-c", script.Run)
-					c.Dir = defaultStr(overrideDir, script.Dir)
-					c.Stdin = os.Stdin
-					c.Stdout = os.Stdout
-					c.Stderr = os.Stderr
-					c.Env = script.Env
-
+					execCmd := buildExecCmd(ctx, &script)
 					if prefixLogs {
 						color := getColor(index)
-						c.Stdout = newPrefixedWriter(os.Stdout, name, maxNameLength, color)
-						c.Stderr = newPrefixedWriter(os.Stderr, name, maxNameLength, color)
+						execCmd.Stdout = newPrefixedWriter(os.Stdout, name, maxNameLength, color)
+						execCmd.Stderr = newPrefixedWriter(os.Stderr, name, maxNameLength, color)
 					}
 
-					err := c.Run()
-					if err != nil {
-						fmt.Println("[wyp] Failed to run", err)
-						os.Exit(1)
-					}
+					err := execCmd.Run()
+					exitOnErr(err, "Failed to run")
 				}(&wg, entryScript.Combine[i], i)
 			}
 
 			wg.Wait()
 		},
 	}
-	cmd.Flags().StringVar(&overrideDir, "dir", "", "directory to run from")
 	return cmd, &entryScript
 }
 
@@ -272,6 +262,14 @@ func exitOnErr(err error, v ...interface{}) {
 	exit(append(v, ": ", err.Error())...)
 }
 
+func exitOnTrue(ok bool, v ...interface{}) {
+	if ok {
+		return
+	}
+
+	exit(v...)
+}
+
 func exit(v ...interface{}) {
 	exitf("%s", fmt.Sprint(v...))
 }
@@ -310,4 +308,19 @@ func fileExists(filename string) bool {
 func debug(v interface{}) {
 	b, _ := json.MarshalIndent(&v, "", "  ")
 	fmt.Printf("\n[DEBUG] %s\n\n", b)
+}
+
+func buildExecCmd(ctx context.Context, script *Script) *exec.Cmd {
+	if runtime.GOOS == "windows" {
+		exit("Windows is not currently supported")
+	}
+
+	shell := defaultStr(script.Shell, os.Getenv("SHELL"), "bash")
+	c := exec.CommandContext(ctx, shell, "-c", script.Run)
+	c.Env = append(os.Environ(), script.Env...)
+	c.Dir = script.Dir
+	c.Stdin = os.Stdin
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+	return c
 }
