@@ -54,7 +54,22 @@ func main() {
 		if (inspectors == nil || inspectors["npm"] != nil) && f.Name() == "package.json" {
 			scripts["start"] = Script{
 				Run:  "npm start",
-				Help: "start (npm)",
+				Help: "npm start (detected)",
+			}
+		}
+
+		if (inspectors == nil || inspectors["docker"] != nil) && f.Name() == "docker-compose.yml" {
+			scripts["start"] = Script{
+				Run:  "docker-compose up",
+				Help: "docker-compose up (detected)",
+			}
+		}
+
+		if (inspectors == nil || inspectors["make"] != nil) && f.Name() == "Makefile" {
+			fmt.Println("FOUND")
+			scripts["start"] = Script{
+				Run:  "make",
+				Help: "make (detected)",
 			}
 		}
 	}
@@ -282,9 +297,12 @@ func exitf(tmp string, v ...interface{}) {
 
 func initViper() {
 	viper.SetConfigName("wyp")
-	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
-	viper.SetDefault("Inspectors", map[string]interface{}{"npm": true})
+	viper.SetDefault("Inspectors", map[string]interface{}{
+		"npm": true,
+		"docker": true,
+		"make": true,
+	})
 	viper.SetDefault("Scripts", []interface{}{})
 
 	err := viper.ReadInConfig()
