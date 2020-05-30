@@ -1,25 +1,22 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"fmt"
+	"github.com/gschier/wyp/internal"
 	"github.com/logrusorgru/aurora"
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"io"
 	"io/ioutil"
 	"os"
-	"os/exec"
-	"runtime"
 	"strings"
 	"time"
 )
 
 const configFilePath = "./wyp.yaml"
 
-type Script struct {
+type script struct {
 	Combine []string `yaml:"combine"`
 	Dir     string   `yaml:"dir"`
 	Env     []string `yaml:"env"`
@@ -30,6 +27,30 @@ type Script struct {
 	Run     string   `yaml:"run"`
 	Shell   string   `yaml:"shell"`
 	Watch   string   `yaml:"watch"`
+}
+
+type scriptWrapper struct {
+	s *script
+}
+
+func (w *scriptWrapper) Dir() string {
+	return w.s.Dir
+}
+
+func (w *scriptWrapper) Env() []string {
+	return w.s.Env
+}
+
+func (w *scriptWrapper) Name() string {
+	return w.s.Name
+}
+
+func (w *scriptWrapper) Run() string {
+	return w.s.Run
+}
+
+func (w *scriptWrapper) Shell() string {
+	return w.s.Shell
 }
 
 func main() {
@@ -59,7 +80,7 @@ func main() {
 		}
 
 		if (inspectors == nil || inspectors["npm"] != nil) && f.Name() == "package.json" {
-			scripts["start"] = &Script{
+			scripts["start"] = &script{
 				Name: "start",
 				Run:  "npm start",
 				Help: "npm start (detected)",
@@ -67,7 +88,7 @@ func main() {
 		}
 
 		if (inspectors == nil || inspectors["docker"] != nil) && f.Name() == "docker-compose.yml" {
-			scripts["start"] = &Script{
+			scripts["start"] = &script{
 				Name: "start",
 				Run:  "docker-compose up",
 				Help: "docker-compose up (detected)",
@@ -75,7 +96,7 @@ func main() {
 		}
 
 		if (inspectors == nil || inspectors["make"] != nil) && f.Name() == "Makefile" {
-			scripts["start"] = &Script{
+			scripts["start"] = &script{
 				Name: "start",
 				Run:  "make",
 				Help: "make (detected)",
@@ -89,11 +110,11 @@ func main() {
 		Run: func(cmd *cobra.Command, args []string) {
 			names := make([]string, 0)
 			for i, name := range args {
-				names = append(names, aurora.Colorize(name, getColor(i)).String())
+				names = append(names, aurora.Colorize(name, internal.GetColor(i)).String())
 			}
 
 			name := fmt.Sprintf("[%s]", strings.Join(names, ", "))
-			scripts[name] = &Script{
+			scripts[name] = &script{
 				Name:    name,
 				Combine: args,
 			}
@@ -177,7 +198,7 @@ func main() {
 		Use:   "init",
 		Short: "create a new config file",
 		Run: func(cmd *cobra.Command, args []string) {
-			if fileExists(configFilePath) {
+			if internal.FileExists(configFilePath) {
 				exit("Directory already configured")
 			}
 
@@ -216,7 +237,7 @@ func addWatchFlag(cmd *cobra.Command) {
 	cmd.Flags().StringP("watch-dir", "W", "", "restart when files change")
 }
 
-func newRunCmd(ctx context.Context, entryScriptName string, scripts map[string]*Script) (*cobra.Command, *Script) {
+func newRunCmd(ctx context.Context, entryScriptName string, scripts map[string]*script) (*cobra.Command, *script) {
 	entryScript := scripts[entryScriptName]
 
 	// If not combine, add Run script to combine so we only
@@ -249,15 +270,15 @@ func newRunCmd(ctx context.Context, entryScriptName string, scripts map[string]*
 				aurora.Bold(startTime.Format(time.Kitchen)),
 			)
 
-			runScripts := make([]*Script, 0)
+			runScripts := make([]internal.Script, 0)
 			for _, n := range entryScript.Combine {
-				runScripts = append(runScripts, scripts[n])
+				runScripts = append(runScripts, &scriptWrapper{s: scripts[n]})
 			}
 
-			rg := newRunGroup(ctx, runScripts)
+			rg := internal.NewRunGroup(ctx, runScripts)
 			rg.Start()
 
-			watchDir := defaultStr(entryScript.Watch, cmd.Flag("watch-dir").Value.String())
+			watchDir := internal.DefaultStr(entryScript.Watch, cmd.Flag("watch-dir").Value.String())
 			watch, _ := cmd.Flags().GetBool("watch")
 			if watchDir == "" && watch {
 				watchDir = "."
@@ -265,8 +286,8 @@ func newRunCmd(ctx context.Context, entryScriptName string, scripts map[string]*
 
 			if watchDir != "" {
 				fmt.Printf("[wyp] Watching directory \"%s\"\n", watchDir)
-				watchAndRepeat(watchDir, func(e, p string) {
-					fmt.Printf("[wyp] Restarting %s (%s)\n", p, strings.ToLower(e))
+				internal.WatchAndRepeat(watchDir, func(e, p string) {
+					fmt.Printf("[wyp] Restarting from change to %s (%s)\n", p, strings.ToLower(e))
 					rg.Restart()
 				})
 			}
@@ -278,7 +299,7 @@ func newRunCmd(ctx context.Context, entryScriptName string, scripts map[string]*
 				"[wyp] Completed %s at %s in %s\n",
 				entryScriptName,
 				aurora.Bold(time.Now().Format(time.Kitchen)),
-				aurora.Bold(ago(startTime)),
+				aurora.Bold(internal.Ago(startTime)),
 			)
 		},
 	}
@@ -286,50 +307,8 @@ func newRunCmd(ctx context.Context, entryScriptName string, scripts map[string]*
 	return cmd, entryScript
 }
 
-type prefixedWriter struct {
-	w      io.Writer
-	prefix string
-	wrote  int
-}
-
-func newPrefixedWriter(w io.Writer, name string, color aurora.Color) *prefixedWriter {
-	prefix := ""
-
-	if name != "" {
-		prefixStr := fmt.Sprintf("[%s] ", name)
-		prefix = aurora.Colorize(prefixStr, color).String()
-	}
-
-	return &prefixedWriter{
-		w:      w,
-		prefix: prefix,
-	}
-}
-
-func (p2 prefixedWriter) DidWrite() bool {
-	return p2.wrote > 0
-}
-
-func (p2 prefixedWriter) Write(p []byte) (int, error) {
-	// Split on newlines so we can prefix each one
-	lines := bytes.Split(p, []byte{'\n'})
-	for _, l := range lines {
-		if len(l) == 0 {
-			continue
-		}
-
-		line := append(l, '\n')
-		_, _ = p2.w.Write(append([]byte(p2.prefix), line...))
-	}
-
-	n := len(p)
-	p2.wrote += n
-
-	return n, nil
-}
-
-func getScripts() map[string]*Script {
-	scripts := make(map[string]*Script)
+func getScripts() map[string]*script {
+	scripts := make(map[string]*script)
 	_ = viper.UnmarshalKey("scripts", &scripts)
 	for name, s := range scripts {
 		if s.Name == "" {
@@ -345,14 +324,6 @@ func exitOnErr(err error, v ...interface{}) {
 	}
 
 	exit(append(v, ": ", err.Error())...)
-}
-
-func exitOnTrue(ok bool, v ...interface{}) {
-	if ok {
-		return
-	}
-
-	exit(v...)
 }
 
 func exit(v ...interface{}) {
@@ -382,26 +353,4 @@ func initViper() {
 	} else {
 		exitOnErr(err, "Failed to read config file")
 	}
-}
-
-func buildExecCmd(ctx context.Context, script *Script, name string, maxNameLength int, index int, usePrefix bool) *exec.Cmd {
-	if runtime.GOOS == "windows" {
-		exit("Windows is not currently supported")
-	}
-
-	prefix := name
-	// if usePrefix {
-	// 	prefix = name
-	// }
-
-	color := getColor(index)
-	shell := defaultStr(script.Shell, os.Getenv("SHELL"), "bash")
-
-	c := exec.CommandContext(ctx, shell, "-c", script.Run)
-	c.Env = append(os.Environ(), script.Env...)
-	c.Dir = script.Dir
-	c.Stdin = os.Stdin
-	c.Stdout = newPrefixedWriter(os.Stdout, prefix, color)
-	c.Stderr = newPrefixedWriter(os.Stderr, prefix, color)
-	return c
 }

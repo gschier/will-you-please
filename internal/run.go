@@ -1,4 +1,4 @@
-package main
+package internal
 
 import (
 	"context"
@@ -7,9 +7,17 @@ import (
 	"os/exec"
 )
 
+type Script interface {
+	Dir() string
+	Env() []string
+	Name() string
+	Run() string
+	Shell() string
+}
+
 type run struct {
 	cmd       *exec.Cmd
-	script    *Script
+	script    Script
 	pid       int
 	startLock bool
 	index     int
@@ -22,7 +30,7 @@ type runGroup struct {
 	ctx  context.Context
 }
 
-func newRunGroup(ctx context.Context, scripts []*Script) *runGroup {
+func NewRunGroup(ctx context.Context, scripts []Script) *runGroup {
 	runs := make([]*run, len(scripts))
 	for i, s := range scripts {
 		runs[i] = &run{
@@ -60,7 +68,9 @@ func (rg *runGroup) Start() {
 
 		go func(r *run) {
 			err := r.cmd.Start()
-			exitOnErr(err, "Failed to start "+r.script.Name)
+			if err != nil {
+				panic(err)
+			}
 			r.startLock = false
 
 			r.pid = r.cmd.Process.Pid
@@ -104,16 +114,16 @@ func (rg *runGroup) Wait() error {
 	return nil
 }
 
-func mkCmd(ctx context.Context, s *Script, index int) *exec.Cmd {
-	shell := defaultStr(s.Shell, os.Getenv("SHELL"), "bash")
+func mkCmd(ctx context.Context, s Script, index int) *exec.Cmd {
+	shell := DefaultStr(s.Shell(), os.Getenv("SHELL"), "bash")
 
-	cmd := exec.CommandContext(ctx, shell, "-c", s.Run)
+	cmd := exec.CommandContext(ctx, shell, "-c", s.Run())
 
-	cmd.Env = append(os.Environ(), s.Env...)
-	cmd.Dir = s.Dir
+	cmd.Env = append(os.Environ(), s.Env()...)
+	cmd.Dir = s.Dir()
 	cmd.Stdin = os.Stdin
-	cmd.Stdout = newPrefixedWriter(os.Stdout, s.Name, getColor(index))
-	cmd.Stderr = newPrefixedWriter(os.Stderr, s.Name, getColor(index))
+	cmd.Stdout = newPrefixedWriter(os.Stdout, s.Name(), GetColor(index))
+	cmd.Stderr = newPrefixedWriter(os.Stderr, s.Name(), GetColor(index))
 
 	return cmd
 }

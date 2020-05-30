@@ -1,4 +1,4 @@
-package main
+package internal
 
 import (
 	"github.com/radovskyb/watcher"
@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func watchAndRepeat(dir string, cb func(e, p string)) {
+func WatchAndRepeat(dir string, cb func(e, p string)) {
 	w := watcher.New()
 	w.SetMaxEvents(1)
 

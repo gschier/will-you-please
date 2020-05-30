@@ -1,4 +1,4 @@
-package main
+package internal
 
 import (
 	"encoding/json"
@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func ago(t time.Time) string {
+func Ago(t time.Time) string {
 	d := time.Now().Sub(t)
 
 	if d.Hours() > 1 {
@@ -30,12 +30,12 @@ func ago(t time.Time) string {
 	return fmt.Sprintf("%dμs", d.Microseconds())
 }
 
-func debug(v interface{}) {
+func Debug(v interface{}) {
 	b, _ := json.MarshalIndent(&v, "", "  ")
 	fmt.Printf("\n[DEBUG] %s\n\n", b)
 }
 
-func fileExists(filename string) bool {
+func FileExists(filename string) bool {
 	_, err := os.Stat(filename)
 	if os.IsNotExist(err) {
 		return false
@@ -44,7 +44,7 @@ func fileExists(filename string) bool {
 	return true
 }
 
-func defaultStr(str ...string) string {
+func DefaultStr(str ...string) string {
 	for _, s := range str {
 		if s != "" {
 			return s
@@ -54,7 +54,7 @@ func defaultStr(str ...string) string {
 	return ""
 }
 
-func getColor(i int) aurora.Color {
+func GetColor(i int) aurora.Color {
 	colors := []aurora.Color{
 		aurora.MagentaFg,
 		aurora.BlueFg,
