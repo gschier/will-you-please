@@ -15,17 +15,16 @@ Or, download and copy the [latest release](https://github.com/gschier/wyp/releas
 ## Getting Started
 
 ```bash
-# Generate a wyp.yaml file to put scripts in
-wyp init
+wyp init                       # Generate wyp.yaml
 
-# List runnable scripts
-wyp run
+wyp run --prompt               # Prompt for script to run
+wyp run [name]                 # Execute script by name
+wyp run --watch . [name]       # Restart on watch
 
-# Run script by name
-wyp run [name]
+wyp combine [name...]          # Execute scripts in parallel
+wyp combine --watch [name...]  # Execute in parallel and watch
 
-# Shorthand for running start script
-wyp start
+wyp start                      # Shorthand for `wyp run start`
 ```
 
 ## Configuration
@@ -70,4 +69,7 @@ scripts:
 
     # Select between bash/zsh/sh (default: current shell)
     shell: bash
+
+    # Restart on file changes (recursive)
+    watch: .
 ```

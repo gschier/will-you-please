@@ -20,19 +20,16 @@ import (
 const configFilePath = "./wyp.yaml"
 
 type Script struct {
-	Run     string   `yaml:"run"`
-	Name    string   `yaml:"name"`
-	Help    string   `yaml:"help"`
-	Env     []string `yaml:"env"`
 	Combine []string `yaml:"combine"`
 	Dir     string   `yaml:"dir"`
+	Env     []string `yaml:"env"`
+	Help    string   `yaml:"help"`
 	Hide    bool     `yaml:"hide"`
+	Name    string   `yaml:"name"`
 	Root    bool     `yaml:"root"`
+	Run     string   `yaml:"run"`
 	Shell   string   `yaml:"shell"`
-	Proxy   *struct {
-		Addr string `yaml:"addr"`
-		Port string `yaml:"port"`
-	}
+	Watch   string   `yaml:"watch"`
 }
 
 func main() {
@@ -88,7 +85,7 @@ func main() {
 
 	cmdCombine := &cobra.Command{
 		Use:   "combine [scripts...]",
-		Short: "run multiple scripts by name",
+		Short: "execute multiple scripts by name",
 		Run: func(cmd *cobra.Command, args []string) {
 			names := make([]string, 0)
 			for i, name := range args {
@@ -186,19 +183,6 @@ func main() {
 	}
 	addWatchFlag(cmdStart)
 
-	cmdKill := &cobra.Command{
-		Use:   "kill [pid]",
-		Short: "kill a running process",
-		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
-			c := exec.CommandContext(context.Background(), "kill", args[0])
-			c.Stdout = os.Stdout
-			c.Stderr = os.Stderr
-			fmt.Println("[wyp] Killing process", args[0])
-			_ = c.Run()
-		},
-	}
-
 	cmdInit := &cobra.Command{
 		Use:   "init",
 		Short: "create a new config file",
@@ -227,7 +211,6 @@ func main() {
 		cmdInit,
 		cmdStart,
 		cmdRun,
-		cmdKill,
 		cmdCombine,
 	)
 
