@@ -29,3 +29,12 @@ scripts:
   vendor:
     help: refresh all dependencies
     run: go mod tidy && go mod vendor
+  count:
+    help: count to 5
+    run: echo 1; sleep 0.2; echo 2; sleep 0.2; echo 3; sleep 0.2; echo 4; sleep 0.2; echo 5; sleep 0.2;
+  sleep:
+    help: catch some z's
+    run: while true; do echo "zzz"; sleep 0.5; done
+  sleepLong:
+    help: catch some longer z's
+    run: while true; do echo "zzz"; sleep 30; done
