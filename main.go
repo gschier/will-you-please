@@ -263,7 +263,7 @@ func newRunCmd(ctx context.Context, entryScriptName string, scripts map[string]*
 			rg.Start()
 
 			if f := cmd.Flag("watch"); f != nil && f.Value.String() != "" {
-				fmt.Println("[wyp] Watching", f.Value.String())
+				fmt.Printf("[wyp] Watching directory \"%s\"\n", f.Value.String())
 				watchAndRepeat(f.Value.String(), func(e, p string) {
 					fmt.Printf("[wyp] Restarting %s (%s)\n", p, strings.ToLower(e))
 					rg.Restart()
