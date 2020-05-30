@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/logrusorgru/aurora"
+	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"io"
@@ -82,10 +83,47 @@ func main() {
 		}
 	}
 
+	cmdRunFlagSelect := false
 	cmdRun := &cobra.Command{
 		Use:   "run [script]",
-		Short: "execute script by name",
+		Short: "run script by name",
+		Run: func(cmd *cobra.Command, args []string) {
+			if !cmdRunFlagSelect && len(args) == 0 {
+				exit("script not provided")
+				return
+			}
+
+			items := make([]string, 0)
+			itemsMap := make(map[string]string)
+
+			for name, script := range scripts {
+				suffix := ""
+				if script.Help != "" {
+					suffix = fmt.Sprintf(": %s", script.Help)
+				}
+
+				markedUpItem := fmt.Sprintf("%s%s", aurora.Bold(name), suffix)
+				itemsMap[markedUpItem] = name
+				items = append(items, markedUpItem)
+			}
+
+			prompt := promptui.Select{
+				Label:        aurora.Bold("Select a script to run"),
+				Items:        items,
+				Size:         20,
+				HideHelp:     true,
+				HideSelected: true,
+			}
+
+			_, result, err := prompt.Run()
+			exitOnErr(err, "Failed to select script")
+
+			scriptName := itemsMap[result]
+			newCmd, _ := newRunCmd(ctx, scriptName, scripts)
+			newCmd.Run(cmd, nil)
+		},
 	}
+	cmdRun.Flags().BoolVarP(&cmdRunFlagSelect, "select", "s", false, "select from list")
 
 	for name := range scripts {
 		cmd, script := newRunCmd(ctx, name, scripts)

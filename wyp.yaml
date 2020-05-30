@@ -8,17 +8,21 @@ scripts:
     help: run tests
     run: go test ./...
   message:
+    help: print a greeting
     env:
       - GREETING=World
     run: echo Hello $GREETING!
   env:
+    help: print current environment
     shell: bash
     env:
       - EXTRA=added-in-wyp.yaml
     run: env
   shell:
+    help: echo current shell
     run: echo $0
   proxy:
+    help: start a proxy on port 8000
     proxy:
       addr: http://localhost:8084
       port: 8000
