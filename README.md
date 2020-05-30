@@ -2,7 +2,7 @@
 
 Will you please is a script runner for local development.
 
-![https://raw.githubusercontent.com/gschier/wyp/master/screenshots/demo.gif]
+![Demo GIF](https://raw.githubusercontent.com/gschier/wyp/master/screenshots/demo.gif)
 
 ## Installation
 
