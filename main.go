@@ -252,9 +252,10 @@ func newRunCmd(ctx context.Context, entryScriptName string, scripts map[string]*
 			rg := newRunGroup(ctx, runScripts)
 			rg.Start()
 
-			if f := cmd.Flag("watch"); f != nil && f.Value.String() != "" {
-				fmt.Printf("[wyp] Watching directory \"%s\"\n", f.Value.String())
-				watchAndRepeat(f.Value.String(), func(e, p string) {
+			watch := defaultStr(entryScript.Watch, cmd.Flag("watch").Value.String())
+			if watch != "" {
+				fmt.Printf("[wyp] Watching directory \"%s\"\n", watch)
+				watchAndRepeat(watch, func(e, p string) {
 					fmt.Printf("[wyp] Restarting %s (%s)\n", p, strings.ToLower(e))
 					rg.Restart()
 				})
