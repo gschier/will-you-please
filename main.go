@@ -87,11 +87,17 @@ func main() {
 		Use:   "combine [scripts...]",
 		Short: "run multiple scripts by name",
 		Run: func(cmd *cobra.Command, args []string) {
-			scripts["__temp"] = Script{
+			names := make([]string, 0)
+			for i, name := range args {
+				names = append(names, aurora.Colorize(name, getColor(i)).String())
+			}
+
+			name := fmt.Sprintf("[%s]", strings.Join(names, ", "))
+			scripts[name] = Script{
 				Combine: args,
 			}
 
-			c, _ := newRunCmd(ctx, "__temp", scripts)
+			c, _ := newRunCmd(ctx, name, scripts)
 			c.Run(cmd, nil)
 		},
 	}
@@ -253,6 +259,7 @@ func newRunCmd(ctx context.Context, entryScriptName string, scripts map[string]S
 				aurora.Bold(time.Now().Format(time.Kitchen)),
 			)
 
+			startTime := time.Now()
 			wg := sync.WaitGroup{}
 			combineLen := len(entryScript.Combine)
 			for i := 0; i < combineLen; i++ {
@@ -272,20 +279,19 @@ func newRunCmd(ctx context.Context, entryScriptName string, scripts map[string]S
 						}()
 					}
 
-					startTime := time.Now()
 					err := execCmd.Run()
 					exitOnErr(err, "Failed to run")
-
-					fmt.Printf(
-						"[wyp] Completed %s at %s in %s\n",
-						aurora.Magenta(entryScriptName),
-						aurora.Bold(time.Now().Format(time.Kitchen)),
-						aurora.Bold(ago(startTime)),
-					)
 				}(&wg, entryScript.Combine[i], i)
 			}
 
 			wg.Wait()
+
+			fmt.Printf(
+				"[wyp] Completed %s at %s in %s\n",
+				entryScriptName,
+				aurora.Bold(time.Now().Format(time.Kitchen)),
+				aurora.Bold(ago(startTime)),
+			)
 		},
 	}
 	return cmd, &entryScript
@@ -368,7 +374,7 @@ func exit(v ...interface{}) {
 
 func exitf(tmp string, v ...interface{}) {
 	fmt.Printf("[wyp] "+tmp, v...)
-	fmt.Print("\n")
+	fmt.Print("\n\n")
 	os.Exit(0)
 }
 
