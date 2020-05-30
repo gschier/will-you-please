@@ -17,9 +17,10 @@ Or, download and copy the [latest release](https://github.com/gschier/wyp/releas
 ```bash
 wyp init                       # Generate wyp.yaml
 
-wyp run --prompt               # Prompt for script to run
+wyp run                        # Prompt for script to run
+wyp run --watch ./dir          # Prompt and restart on file change
 wyp run [name]                 # Execute script by name
-wyp run --watch . [name]       # Restart on watch
+wyp run [name] --watch ./dir   # Restart on file change
 
 wyp combine [name...]          # Execute scripts in parallel
 wyp combine --watch [name...]  # Execute in parallel and watch

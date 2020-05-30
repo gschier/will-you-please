@@ -104,20 +104,10 @@ func main() {
 	}
 	addWatchFlag(cmdCombine)
 
-	cmdRunFlagPrompt := false
 	cmdRun := &cobra.Command{
 		Use:   "run [script]",
 		Short: "run script by name",
 		Run: func(cmd *cobra.Command, args []string) {
-			if !cmdRunFlagPrompt && len(args) == 0 {
-				names := make([]string, 0)
-				for name := range scripts {
-					names = append(names, name)
-				}
-				fmt.Printf("%s: %s\n", aurora.Bold("Commands"), strings.Join(names, ", "))
-				return
-			}
-
 			if len(args) > 0 {
 				exitf("Script not found: %s", aurora.Bold(args[0]))
 			}
@@ -152,11 +142,11 @@ func main() {
 			newCmd.Run(cmd, nil)
 		},
 	}
-	cmdRun.Flags().BoolVarP(&cmdRunFlagPrompt, "prompt", "p", false, "prompt for script")
 	addWatchFlag(cmdRun)
 
 	for name := range scripts {
 		cmd, script := newRunCmd(ctx, name, scripts)
+		addWatchFlag(cmd)
 
 		// Don't add start here. It will be
 		if name == "start" {
