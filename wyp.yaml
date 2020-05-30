@@ -26,3 +26,6 @@ scripts:
     proxy:
       addr: http://localhost:8084
       port: 8000
+  vendor:
+    help: refresh all dependencies
+    run: go mod tidy && go mod vendor

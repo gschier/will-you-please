@@ -83,14 +83,35 @@ func main() {
 		}
 	}
 
-	cmdRunFlagSelect := false
+	cmdCombine := &cobra.Command{
+		Use:   "combine [scripts...]",
+		Short: "run multiple scripts by name",
+		Run: func(cmd *cobra.Command, args []string) {
+			scripts["__temp"] = Script{
+				Combine: args,
+			}
+
+			c, _ := newRunCmd(ctx, "__temp", scripts)
+			c.Run(cmd, nil)
+		},
+	}
+
+	cmdRunFlagPrompt := false
 	cmdRun := &cobra.Command{
 		Use:   "run [script]",
 		Short: "run script by name",
 		Run: func(cmd *cobra.Command, args []string) {
-			if !cmdRunFlagSelect && len(args) == 0 {
-				exit("script not provided")
+			if !cmdRunFlagPrompt && len(args) == 0 {
+				names := make([]string, 0)
+				for name := range scripts {
+					names = append(names, name)
+				}
+				fmt.Printf("%s: %s\n", aurora.Bold("Commands"), strings.Join(names, ", "))
 				return
+			}
+
+			if len(args) > 0 {
+				exitf("Script not found: %s", aurora.Bold(args[0]))
 			}
 
 			items := make([]string, 0)
@@ -123,7 +144,7 @@ func main() {
 			newCmd.Run(cmd, nil)
 		},
 	}
-	cmdRun.Flags().BoolVarP(&cmdRunFlagSelect, "select", "s", false, "select from list")
+	cmdRun.Flags().BoolVarP(&cmdRunFlagPrompt, "prompt", "p", false, "prompt for script")
 
 	for name := range scripts {
 		cmd, script := newRunCmd(ctx, name, scripts)
@@ -194,6 +215,7 @@ func main() {
 		cmdStart,
 		cmdRun,
 		cmdKill,
+		cmdCombine,
 	)
 
 	_ = rootCmd.Execute()
@@ -201,13 +223,11 @@ func main() {
 
 func newRunCmd(ctx context.Context, entryScriptName string, scripts map[string]Script) (*cobra.Command, *Script) {
 	entryScript := scripts[entryScriptName]
-	prefixLogs := true
 
 	// If not combine, add Run script to combine so we only
 	// have to deal with that
 	if entryScript.Combine == nil {
 		entryScript.Combine = []string{entryScriptName}
-		prefixLogs = false
 	}
 
 	maxNameLength := 0
@@ -227,10 +247,15 @@ func newRunCmd(ctx context.Context, entryScriptName string, scripts map[string]S
 		Short:  entryScript.Help,
 		Hidden: entryScript.Hide,
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("[wyp] Running \"%s\" at %s\n", entryScriptName, time.Now().Format(time.Kitchen))
+			fmt.Printf(
+				"[wyp] Running %s at %s\n",
+				aurora.Magenta(entryScriptName),
+				aurora.Bold(time.Now().Format(time.Kitchen)),
+			)
 
 			wg := sync.WaitGroup{}
-			for i := 0; i < len(entryScript.Combine); i++ {
+			combineLen := len(entryScript.Combine)
+			for i := 0; i < combineLen; i++ {
 				wg.Add(1)
 				go func(wg *sync.WaitGroup, name string, index int) {
 					defer wg.Done()
@@ -238,12 +263,7 @@ func newRunCmd(ctx context.Context, entryScriptName string, scripts map[string]S
 					script, ok := scripts[name]
 					exitOnTrue(ok, "script not found for", name)
 
-					execCmd := buildExecCmd(ctx, &script)
-					if prefixLogs {
-						color := getColor(index)
-						execCmd.Stdout = newPrefixedWriter(os.Stdout, name, maxNameLength, color)
-						execCmd.Stderr = newPrefixedWriter(os.Stderr, name, maxNameLength, color)
-					}
+					execCmd := buildExecCmd(ctx, &script, name, maxNameLength, index, combineLen > 1)
 
 					if script.Proxy != nil {
 						go func() {
@@ -256,7 +276,12 @@ func newRunCmd(ctx context.Context, entryScriptName string, scripts map[string]S
 					err := execCmd.Run()
 					exitOnErr(err, "Failed to run")
 
-					fmt.Printf("\n[wyp] Completed in %s\n", ago(time.Now().Sub(startTime)))
+					fmt.Printf(
+						"[wyp] Completed %s at %s in %s\n",
+						aurora.Magenta(entryScriptName),
+						aurora.Bold(time.Now().Format(time.Kitchen)),
+						aurora.Bold(ago(startTime)),
+					)
 				}(&wg, entryScript.Combine[i], i)
 			}
 
@@ -269,18 +294,32 @@ func newRunCmd(ctx context.Context, entryScriptName string, scripts map[string]S
 type prefixedWriter struct {
 	w      io.Writer
 	prefix string
+	wrote  int
 }
 
 func newPrefixedWriter(w io.Writer, name string, length int, color aurora.Color) *prefixedWriter {
-	padBy := length - len(name)
-	padding := ""
+	prefix := ""
 
-	for i := 0; i < padBy; i++ {
-		padding += " "
+	if name != "" {
+		padBy := length - len(name)
+		padding := ""
+
+		for i := 0; i < padBy; i++ {
+			padding += " "
+		}
+
+		prefixStr := fmt.Sprintf("[%s] %s", name, padding)
+		prefix = aurora.Colorize(prefixStr, color).String()
 	}
 
-	prefix := fmt.Sprintf("[%s] %s", name, padding)
-	return &prefixedWriter{w: w, prefix: aurora.Colorize(prefix, color).String()}
+	return &prefixedWriter{
+		w:      w,
+		prefix: prefix,
+	}
+}
+
+func (p2 prefixedWriter) DidWrite() bool {
+	return p2.wrote > 0
 }
 
 func (p2 prefixedWriter) Write(p []byte) (int, error) {
@@ -290,10 +329,15 @@ func (p2 prefixedWriter) Write(p []byte) (int, error) {
 		if len(l) == 0 {
 			continue
 		}
+
 		line := append(l, '\n')
 		_, _ = p2.w.Write(append([]byte(p2.prefix), line...))
 	}
-	return len(p), nil
+
+	n := len(p)
+	p2.wrote += n
+
+	return n, nil
 }
 
 func getScripts() map[string]Script {
@@ -347,17 +391,24 @@ func initViper() {
 	}
 }
 
-func buildExecCmd(ctx context.Context, script *Script) *exec.Cmd {
+func buildExecCmd(ctx context.Context, script *Script, name string, maxNameLength int, index int, usePrefix bool) *exec.Cmd {
 	if runtime.GOOS == "windows" {
 		exit("Windows is not currently supported")
 	}
 
+	prefix := name
+	// if usePrefix {
+	// 	prefix = name
+	// }
+
+	color := getColor(index)
 	shell := defaultStr(script.Shell, os.Getenv("SHELL"), "bash")
+
 	c := exec.CommandContext(ctx, shell, "-c", script.Run)
 	c.Env = append(os.Environ(), script.Env...)
 	c.Dir = script.Dir
 	c.Stdin = os.Stdin
-	c.Stdout = os.Stdout
-	c.Stderr = os.Stderr
+	c.Stdout = newPrefixedWriter(os.Stdout, prefix, maxNameLength, color)
+	c.Stderr = newPrefixedWriter(os.Stderr, prefix, maxNameLength, color)
 	return c
 }

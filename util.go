@@ -8,18 +8,26 @@ import (
 	"time"
 )
 
-func ago(d time.Duration) string {
-	if d.Hours() > 1 {
-		return fmt.Sprintf("%.1fh", float64(d.Microseconds())/(1000^2/3600))
-	} else if d.Minutes() > 1 {
-		return fmt.Sprintf("%.1fm", float64(d.Microseconds())/(1000^2/60))
-	} else if d.Seconds() > 1 {
-		return fmt.Sprintf("%.1fs", float64(d.Microseconds())/(1000^2))
-	} else if d.Milliseconds() > 1 {
-		return fmt.Sprintf("%.1fms", float64(d.Microseconds())/1000)
-	} else {
-		return fmt.Sprintf("%dμs", d.Microseconds())
+func ago(t time.Time) string {
+	d := time.Now().Sub(t)
+
+	if d.Hours() > 10 {
+		return fmt.Sprintf("%.2fh", d.Minutes()/60)
 	}
+
+	if d.Minutes() > 10 {
+		return fmt.Sprintf("%.2fm", d.Seconds()/60)
+	}
+
+	if d.Seconds() > 10 {
+		return fmt.Sprintf("%.2fs", float32(d.Milliseconds())/1000)
+	}
+
+	if d.Milliseconds() > 10 {
+		return fmt.Sprintf("%.2fms", float32(d.Microseconds())/1000)
+	}
+
+	return fmt.Sprintf("%dμs", d.Microseconds())
 }
 
 func debug(v interface{}) {
