@@ -208,7 +208,8 @@ func main() {
 }
 
 func addWatchFlag(cmd *cobra.Command) {
-	cmd.PersistentFlags().StringP("watch", "w", "", "restart when files change")
+	cmd.PersistentFlags().BoolP("watch", "w", false, "restart when files change")
+	cmd.PersistentFlags().StringP("watch-dir", "W", "", "restart when files change")
 }
 
 func newRunCmd(ctx context.Context, entryScriptName string, scripts map[string]*Script) (*cobra.Command, *Script) {
@@ -252,10 +253,15 @@ func newRunCmd(ctx context.Context, entryScriptName string, scripts map[string]*
 			rg := newRunGroup(ctx, runScripts)
 			rg.Start()
 
-			watch := defaultStr(entryScript.Watch, cmd.Flag("watch").Value.String())
-			if watch != "" {
-				fmt.Printf("[wyp] Watching directory \"%s\"\n", watch)
-				watchAndRepeat(watch, func(e, p string) {
+			watchDir := defaultStr(entryScript.Watch, cmd.Flag("watch-dir").Value.String())
+			watch, _ := cmd.Flags().GetBool("watch")
+			if watchDir == "" && watch {
+				watchDir = "."
+			}
+
+			if watchDir != "" {
+				fmt.Printf("[wyp] Watching directory \"%s\"\n", watchDir)
+				watchAndRepeat(watchDir, func(e, p string) {
 					fmt.Printf("[wyp] Restarting %s (%s)\n", p, strings.ToLower(e))
 					rg.Restart()
 				})

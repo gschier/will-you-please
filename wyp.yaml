@@ -6,7 +6,7 @@ scripts:
   test:
     root: true
     help: run tests
-    watch: .
+    watch: ./
     run: go test ./...
   vendor:
     help: refresh all dependencies
