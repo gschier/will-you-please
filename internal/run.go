@@ -13,6 +13,7 @@ type Script interface {
 	Name() string
 	Run() string
 	Shell() string
+	Prefix() string
 }
 
 type run struct {
@@ -121,9 +122,11 @@ func mkCmd(ctx context.Context, s Script, index int) *exec.Cmd {
 
 	cmd.Env = append(os.Environ(), s.Env()...)
 	cmd.Dir = s.Dir()
+
+	prefix := DefaultStr(s.Prefix(), s.Name())
+	cmd.Stdout = newPrefixedWriter(os.Stdout, prefix, GetColor(index))
+	cmd.Stderr = newPrefixedWriter(os.Stderr, prefix, GetColor(index))
 	cmd.Stdin = os.Stdin
-	cmd.Stdout = newPrefixedWriter(os.Stdout, s.Name(), GetColor(index))
-	cmd.Stderr = newPrefixedWriter(os.Stderr, s.Name(), GetColor(index))
 
 	return cmd
 }

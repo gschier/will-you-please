@@ -1,6 +1,5 @@
 package internal
 
-
 import (
 	"bytes"
 	"fmt"
@@ -35,14 +34,17 @@ func (p2 prefixedWriter) DidWrite() bool {
 func (p2 prefixedWriter) Write(p []byte) (int, error) {
 	// Split on newlines so we can prefix each one
 	lines := bytes.Split(p, []byte{'\n'})
-	for _, l := range lines {
-		if len(l) == 0 {
+	for i, l := range lines {
+		// Skip last empty line
+		if i == len(lines)-1 && len(l) == 0 {
 			continue
 		}
 
-		line := append(l, '\n')
-		_, _ = p2.w.Write(append([]byte(p2.prefix), line...))
+		lines[i] = append([]byte(p2.prefix), l...)
 	}
+
+	prefixedP := bytes.Join(lines, []byte{'\n'})
+	_, _ = p2.w.Write(prefixedP)
 
 	n := len(p)
 	p2.wrote += n

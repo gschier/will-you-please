@@ -16,43 +16,6 @@ import (
 
 const configFilePath = "./wyp.yaml"
 
-type script struct {
-	Combine []string `yaml:"combine"`
-	Dir     string   `yaml:"dir"`
-	Env     []string `yaml:"env"`
-	Help    string   `yaml:"help"`
-	Hide    bool     `yaml:"hide"`
-	Name    string   `yaml:"name"`
-	Root    bool     `yaml:"root"`
-	Run     string   `yaml:"run"`
-	Shell   string   `yaml:"shell"`
-	Watch   string   `yaml:"watch"`
-}
-
-type scriptWrapper struct {
-	s *script
-}
-
-func (w *scriptWrapper) Dir() string {
-	return w.s.Dir
-}
-
-func (w *scriptWrapper) Env() []string {
-	return w.s.Env
-}
-
-func (w *scriptWrapper) Name() string {
-	return w.s.Name
-}
-
-func (w *scriptWrapper) Run() string {
-	return w.s.Run
-}
-
-func (w *scriptWrapper) Shell() string {
-	return w.s.Shell
-}
-
 func main() {
 	ctx := context.Background()
 
@@ -167,7 +130,6 @@ func main() {
 
 	for name := range scripts {
 		cmd, script := newRunCmd(ctx, name, scripts)
-		addWatchFlag(cmd)
 
 		// Don't add start here. It will be
 		if name == "start" {
@@ -253,11 +215,6 @@ func newRunCmd(ctx context.Context, entryScriptName string, scripts map[string]*
 		}
 	}
 
-	// Fill in help for combine script if not there
-	if entryScript.Combine != nil && entryScript.Help == "" {
-		entryScript.Help = fmt.Sprintf("run in parallel %s", strings.Join(entryScript.Combine, ", "))
-	}
-
 	cmd := &cobra.Command{
 		Use:    entryScriptName,
 		Short:  entryScript.Help,
@@ -272,7 +229,7 @@ func newRunCmd(ctx context.Context, entryScriptName string, scripts map[string]*
 
 			runScripts := make([]internal.Script, 0)
 			for _, n := range entryScript.Combine {
-				runScripts = append(runScripts, &scriptWrapper{s: scripts[n]})
+				runScripts = append(runScripts, newScriptWrapper(scripts[n]))
 			}
 
 			rg := internal.NewRunGroup(ctx, runScripts)
@@ -303,6 +260,7 @@ func newRunCmd(ctx context.Context, entryScriptName string, scripts map[string]*
 			)
 		},
 	}
+	addWatchFlag(cmd)
 
 	return cmd, entryScript
 }
@@ -353,4 +311,50 @@ func initViper() {
 	} else {
 		exitOnErr(err, "Failed to read config file")
 	}
+}
+
+type script struct {
+	Combine []string `yaml:"combine"`
+	Dir     string   `yaml:"dir"`
+	Env     []string `yaml:"env"`
+	Help    string   `yaml:"help"`
+	Hide    bool     `yaml:"hide"`
+	Name    string   `yaml:"name"`
+	Root    bool     `yaml:"root"`
+	Run     string   `yaml:"run"`
+	Shell   string   `yaml:"shell"`
+	Watch   string   `yaml:"watch"`
+	Prefix  string   `yaml:"prefix"`
+}
+
+type scriptWrapper struct {
+	s *script
+}
+
+func newScriptWrapper(s *script) *scriptWrapper {
+	return &scriptWrapper{s: s}
+}
+
+func (w *scriptWrapper) Dir() string {
+	return w.s.Dir
+}
+
+func (w *scriptWrapper) Env() []string {
+	return w.s.Env
+}
+
+func (w *scriptWrapper) Name() string {
+	return w.s.Name
+}
+
+func (w *scriptWrapper) Run() string {
+	return w.s.Run
+}
+
+func (w *scriptWrapper) Shell() string {
+	return w.s.Shell
+}
+
+func (w *scriptWrapper) Prefix() string {
+	return w.s.Prefix
 }

@@ -1,0 +1,22 @@
+[scripts.install]
+root = true
+help = "run Go install"
+run = "go install ./..."
+
+[scripts.test]
+root = true
+help = "run tests"
+watch = "."
+run = "go test ./..."
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~ #
+# Some commands for testing #
+# ~~~~~~~~~~~~~~~~~~~~~~~~~ #
+
+[scripts.count]
+help = "count to 5"
+run = "echo 1; sleep 0.2; echo 2; sleep 0.2; echo 3; sleep 0.2; echo 4; sleep 0.2; echo 5; sleep 0.2;"
+
+[scripts.sleep]
+help = "catch some z's"
+run = 'while true; do echo "zzz"; sleep 0.5; done'
