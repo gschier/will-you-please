@@ -314,17 +314,17 @@ func initViper() {
 }
 
 type script struct {
-	Combine []string `yaml:"combine"`
-	Dir     string   `yaml:"dir"`
-	Env     []string `yaml:"env"`
-	Help    string   `yaml:"help"`
-	Hide    bool     `yaml:"hide"`
-	Name    string   `yaml:"name"`
-	Root    bool     `yaml:"root"`
-	Run     string   `yaml:"run"`
-	Shell   string   `yaml:"shell"`
-	Watch   string   `yaml:"watch"`
-	Prefix  string   `yaml:"prefix"`
+	Combine []string `mapstructure:"combine"`
+	Dir     string   `mapstructure:"dir"`
+	Env     []string `mapstructure:"env"`
+	Help    string   `mapstructure:"help"`
+	Hide    bool     `mapstructure:"hide"`
+	Name    string   `mapstructure:"name"`
+	Root    bool     `mapstructure:"root"`
+	Run     string   `mapstructure:"run"`
+	Shell   string   `mapstructure:"shell"`
+	Watch   string   `mapstructure:"watch"`
+	Prefix  string   `mapstructure:"prefix"`
 }
 
 type scriptWrapper struct {
