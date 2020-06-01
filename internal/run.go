@@ -3,8 +3,11 @@ package internal
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
+	"syscall"
 )
 
 type Script interface {
@@ -61,6 +64,18 @@ func (rg *runGroup) Start() {
 		if r.cmd != nil && r.cmd.ProcessState == nil {
 			_ = r.cmd.Process.Kill()
 		}
+
+		go func() {
+			sigs := make(chan os.Signal, 1)
+			signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+			sig := <-sigs
+
+			fmt.Printf("[wyp] Signalling %s with %s\n", r.script.Name(), sig)
+			err := r.cmd.Process.Signal(sig)
+			if err != nil {
+				fmt.Println("[wyp] Failed to signal", r.script.Name(), err)
+			}
+		}()
 
 		// Make a new command
 		r.cmd = mkCmd(rg.ctx, r.script, r.index)

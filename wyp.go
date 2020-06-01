@@ -10,7 +10,9 @@ import (
 	"github.com/spf13/viper"
 	"io/ioutil"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -148,7 +150,7 @@ func main() {
 		cmdStart = &cobra.Command{
 			Use:   "start",
 			Short: "shortcut to run the start script",
-			Args:  cobra.MinimumNArgs(0),
+			Args:  cobra.ExactArgs(0),
 			Run: func(cmd *cobra.Command, args []string) {
 				exit("No start script defined")
 			},
@@ -188,6 +190,10 @@ func main() {
 	)
 
 	_ = rootCmd.Execute()
+
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	<-sigs
 }
 
 func addWatchFlag(cmd *cobra.Command) {
@@ -263,6 +269,9 @@ func newRunCmd(ctx context.Context, entryScriptName string, scripts map[string]*
 				aurora.Bold(time.Now().Format(time.Kitchen)),
 				aurora.Bold(internal.Ago(startTime)),
 			)
+
+			// Exit wyp process
+			os.Exit(0)
 		},
 	}
 	addWatchFlag(cmd)
