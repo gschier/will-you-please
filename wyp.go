@@ -202,10 +202,15 @@ func addWatchFlag(cmd *cobra.Command) {
 func newRunCmd(ctx context.Context, entryScriptName string, scripts map[string]*script) (*cobra.Command, *script) {
 	entryScript := scripts[entryScriptName]
 
-	// If not combine, add Run script to combine so we only
-	// have to deal with that
+	// Default combine if not defined
 	if entryScript.Combine == nil {
-		entryScript.Combine = []string{entryScriptName}
+		entryScript.Combine = []string{}
+	}
+
+	// Add run script to combine if it exists
+	// NOTE: This should work if both "run" and "combine" are filled
+	if entryScript.Run != "" {
+		entryScript.Combine = append(entryScript.Combine, entryScriptName)
 	}
 
 	maxNameLength := 0
