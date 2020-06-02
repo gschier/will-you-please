@@ -1,4 +1,4 @@
-# Will You Please
+# Will You Please [![Release](https://github.com/gschier/will-you-please/workflows/Release/badge.svg)](https://github.com/gschier/will-you-please/actions?query=workflow%3ARelease)
 
 Will you please is a script runner for local development.
 
