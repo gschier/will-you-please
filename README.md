@@ -4,19 +4,23 @@ Will you please is a script runner for local development.
 
 ![Demo GIF](https://raw.githubusercontent.com/gschier/wyp/master/screenshots/demo.gif)
 
-## Installation
+## Getting Started
+
+Install the `wyp` binary:
 
 ```bash
-go get -u github.com/gschier/wyp
+curl -sf https://gobinaries.com/gschier/wyp | sh
 ```
 
-Or, download and copy the [latest release](https://github.com/gschier/wyp/releases) to your PATH.
-
-## Getting Started
+Generate a config file:
 
 ```bash
 wyp init  # Generate ./wyp.yaml
+```
 
+Run some commands!
+
+```bash
 wyp run                           # Prompt for script to run
 wyp run [name]                    # Execute script by name
 wyp run [name] --watch            # Prompt and restart on file change
@@ -38,8 +42,20 @@ Configuration is defined in `wyp.(yaml|toml|json)`. An sample config can be gene
 
 # Scripts are defined in a map of [name] => [config]
 scripts:
-
-  # Define a script called "example" that can be run with "wyp run example"
+  helloworld: 
+    help: say hello
+    run: echo 'Hello World!'
+  
+  sleep:
+    help: get some rest
+    run: 'while true; do echo "zzz"; sleep 0.5; done'
+  
+  build:
+    help: build static assets
+    run: npm run build
+    watch: .
+  
+  # Complete example
   example:
 
     # Help text for command
@@ -48,12 +64,12 @@ scripts:
     # Make available under "wyp [name]" vs default "wyp run [name]"
     root: true
   
-    # Execute multiple scripts at once. Can not use with "run"
+    # Execute other scripts by name
     combine:
       - simpleGreet
       - detailedGreet
 
-    # Execute command. Can not use with "combine"
+    # Code to execute for script
     run: echo "Hello World"
   
     # Define environment variables for run context
@@ -61,7 +77,7 @@ scripts:
       - NAME=value
       - ANOTHER='something that needs quotes'
 
-    # Change the directory the command is run in
+    # Change the directory the command is run in (default ./)
     dir: './some/other/directory'
 
     # Hide command from help output
@@ -70,6 +86,6 @@ scripts:
     # Select between bash/zsh/sh (default: current shell)
     shell: bash
 
-    # Restart on file changes (recursive)
+    # Restart when file change detected (recursive)
     watch: .
 ```
