@@ -139,8 +139,8 @@ func mkCmd(ctx context.Context, s Script, index int) *exec.Cmd {
 	cmd.Dir = s.Dir()
 
 	prefix := DefaultStr(s.Prefix(), s.Name())
-	cmd.Stdout = newPrefixedWriter(os.Stdout, prefix, GetColor(index))
-	cmd.Stderr = newPrefixedWriter(os.Stderr, prefix, GetColor(index))
+	cmd.Stdout = NewPrefixedWriter(os.Stdout, prefix, GetColor(index))
+	cmd.Stderr = NewPrefixedWriter(os.Stderr, prefix, GetColor(index))
 	cmd.Stdin = os.Stdin
 
 	return cmd

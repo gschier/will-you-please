@@ -75,7 +75,7 @@ func main() {
 		Run: func(cmd *cobra.Command, args []string) {
 			names := make([]string, 0)
 			for i, name := range args {
-				names = append(names, aurora.Colorize(name, internal.GetColor(i)).String())
+				names = append(names, aurora.Colorize(name, *internal.GetColor(i)).String())
 			}
 
 			name := fmt.Sprintf("[%s]", strings.Join(names, ", "))

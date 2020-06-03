@@ -54,7 +54,7 @@ func DefaultStr(str ...string) string {
 	return ""
 }
 
-func GetColor(i int) aurora.Color {
+func GetColor(i int) *aurora.Color {
 	colors := []aurora.Color{
 		aurora.MagentaFg,
 		aurora.BlueFg,
@@ -64,5 +64,5 @@ func GetColor(i int) aurora.Color {
 		aurora.RedFg,
 	}
 
-	return colors[i%len(colors)]
+	return &colors[i%len(colors)]
 }

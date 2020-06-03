@@ -1,53 +1,53 @@
 package internal
 
 import (
-	"bytes"
 	"fmt"
 	"github.com/logrusorgru/aurora"
 	"io"
 )
 
 type prefixedWriter struct {
-	w      io.Writer
-	prefix string
-	wrote  int
+	w        io.Writer
+	prefix   []byte
+	wrote    int
+	lastByte byte
 }
 
-func newPrefixedWriter(w io.Writer, name string, color aurora.Color) *prefixedWriter {
+func NewPrefixedWriter(w io.Writer, name string, color *aurora.Color) *prefixedWriter {
 	prefix := ""
 
 	if name != "" {
 		prefixStr := fmt.Sprintf("[%s] ", name)
-		prefix = aurora.Colorize(prefixStr, color).String()
+		prefix = prefixStr
+		if color != nil {
+			prefix = aurora.Colorize(prefixStr, *color).String()
+		}
 	}
 
 	return &prefixedWriter{
 		w:      w,
-		prefix: prefix,
+		prefix: []byte(prefix),
 	}
 }
 
-func (p2 prefixedWriter) DidWrite() bool {
+func (p2 *prefixedWriter) DidWrite() bool {
 	return p2.wrote > 0
 }
 
-func (p2 prefixedWriter) Write(p []byte) (int, error) {
+func (p2 *prefixedWriter) Write(p []byte) (int, error) {
 	// Split on newlines so we can prefix each one
-	lines := bytes.Split(p, []byte{'\n'})
-	for i, l := range lines {
-		// Skip last empty line
-		if i == len(lines)-1 && len(l) == 0 {
-			continue
+	count := 0
+	for _, b := range p {
+		// If it's the first char or the last one was a newline, write a prefix
+		if p2.wrote == 0 || p2.lastByte == '\n' || p2.lastByte == '\r' {
+			_, _ = p2.w.Write(p2.prefix)
 		}
 
-		lines[i] = append([]byte(p2.prefix), l...)
+		_, _ = p2.w.Write([]byte{b})
+		p2.lastByte = b
+		p2.wrote++
+		count++
 	}
 
-	prefixedP := bytes.Join(lines, []byte{'\n'})
-	_, _ = p2.w.Write(prefixedP)
-
-	n := len(p)
-	p2.wrote += n
-
-	return n, nil
+	return count, nil
 }
