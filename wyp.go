@@ -216,7 +216,15 @@ func newRunCmd(ctx context.Context, entryScriptName string, scripts map[string]*
 	// Add run script to combine if it exists
 	// NOTE: This should work if both "run" and "combine" are filled
 	if entryScript.Run != "" {
-		entryScript.Combine = append(entryScript.Combine, entryScriptName)
+		found := false
+		for _, name := range entryScript.Combine {
+			if entryScriptName == name {
+				found = true
+			}
+		}
+		if !found {
+			entryScript.Combine = append(entryScript.Combine, entryScriptName)
+		}
 	}
 
 	maxNameLength := 0
