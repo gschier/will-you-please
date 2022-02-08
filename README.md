@@ -50,13 +50,28 @@ scripts:
     help: get some rest
     run: 'while true; do echo "zzz"; sleep 0.5; done'
   
-  build:
-    help: build static assets
-    run: npm run build
+  backend:
+    help: run the backend
+    run: go run main.go
     watch: .
-  
+    
+  backend:
+    help: run the frontend
+    run: npm start
+    watch: ./frontend
+    
+  start:
+    help: run backend and frontend
+    combine:
+      - backend
+      - frontend
+```
+
+Here's a dummy config that showcases all possible options.
+
+```yaml  
   # Complete example
-  example:
+  everything-example:
 
     # Help text for command
     help: command with all options
@@ -66,8 +81,8 @@ scripts:
   
     # Execute other scripts by name
     combine:
-      - simpleGreet
-      - detailedGreet
+      - command1
+      - command2
 
     # Code to execute for script
     run: echo "Hello World"
