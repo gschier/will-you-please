@@ -42,14 +42,6 @@ Configuration is defined in `wyp.(yaml|toml|json)`. An sample config can be gene
 
 # Scripts are defined in a map of [name] => [config]
 scripts:
-  helloworld: 
-    help: say hello
-    run: echo 'Hello World!'
-  
-  sleep:
-    help: get some rest
-    run: 'while true; do echo "zzz"; sleep 0.5; done'
-  
   backend:
     help: run the backend
     run: go run main.go
