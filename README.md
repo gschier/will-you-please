@@ -9,7 +9,7 @@ Will you please is a script runner for local development.
 Install the `wyp` binary:
 
 ```bash
-curl -sf https://gobinaries.com/gschier/wyp | sh
+go install github.com/gschier/wyp@latest
 ```
 
 Generate a config file:
