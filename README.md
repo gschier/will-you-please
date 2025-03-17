@@ -47,7 +47,7 @@ scripts:
     run: go run main.go
     watch: .
     
-  backend:
+  frontend:
     help: run the frontend
     run: npm start
     watch: ./frontend
